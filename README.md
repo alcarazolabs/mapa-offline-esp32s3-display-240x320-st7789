@@ -68,5 +68,5 @@ Push Buttons:
 - C language
 - SPIFFS or FAT filesystem for map storage
 
-## Agradecimeintos/Créditos
+## Agradecimientos/Créditos
 - @gmlonghini (https://github.com/gmlonghini/map-viewer-offline-esp32s3/tree/main)
