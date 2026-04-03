@@ -20,6 +20,12 @@ rgb_dir = "tiles_rgb565"
 os.makedirs(png_dir, exist_ok=True)
 os.makedirs(rgb_dir, exist_ok=True)
 
+headers = {
+    # Unique ID + contact email (recommended by OSM)
+    "User-Agent": "MyPythonMappingApp/1.0 (my_correo@gmail.com)"
+}
+
+
 def deg2num(lat, lon, zoom):
     lat_rad = math.radians(lat)
     n = 2 ** zoom
@@ -86,7 +92,7 @@ for x in range(x_min, x_max + 1):
         if not os.path.exists(png_path):
             url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
             try:
-                r = session.get(url, timeout=10)
+                r = session.get(url, timeout=10, headers=headers)
                 if r.status_code == 200:
                     with open(png_path, "wb") as f:
                         f.write(r.content)
