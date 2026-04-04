@@ -214,7 +214,7 @@ void app_main(void)
 
     xSemaphoreTake(lvgl_mutex, portMAX_DELAY);
     lv_obj_t *scr = lv_scr_act();
-    map_view_create(scr, 16, 24278, 37181);
+    map_view_create(scr, 16, 24278, 37181); // <- Actualizar (tiles_calculator.html)
     xSemaphoreGive(lvgl_mutex);
 
     xTaskCreate(lvgl_task, "lvgl_task ", 16384, NULL, 5, NULL);

@@ -53,8 +53,30 @@ Push Buttons:
 ## Descargar imagenes OpenStreetMap
 
 1. Abrir script "map_downloader.py" que se encuentra en la carpeta "scripts".
-2. Actualizar variable center_lat y center_lon con las coordenadas del area a descargar imagenes del mapa OpenStreetMap.
-3. Luego de descargar las imagenes en formato "rgb565" copiarlas a la carpeta "spiffs_data".
+2. Actualizar variable center_lat y center_lon con las coordenadas del área a descargar imagenes del mapa OpenStreetMap.
+
+- Web recomendada para obtener coordenadas: https://www.mapcoordinates.net/
+
+3. Luego de descargar las imagenes en formato ".rgb565" copiarlas a la carpeta "spiffs_data".
+* Recordar descomentar la linea de codigo:
+
+```
+#spiffs_create_partition_image(storage ../spiffs_data FLASH_IN_PROJECT)
+```
+Qué esta dentro del archivo "CMakeLists.txt".
+
+4. Actualizar linea de codigo en el archivo "main.c": 
+```
+map_view_create(scr, 16, 24278, 37181);
+
+// La función map_view_create(scr, 16, 24278, 37181) recibe:
+
+zoom = 16
+start_tile_x = 24278
+start_tile_y = 37181
+```
+* Actualiza esos valores usando la calculador "tiles_calculator.html" que se encuentra dentro de la carpeta "scripts".
+Guía en vídeo: https://youtu.be/kzpb6G0wuQw
 
 ## Menuconfig ESP-IDF.
 

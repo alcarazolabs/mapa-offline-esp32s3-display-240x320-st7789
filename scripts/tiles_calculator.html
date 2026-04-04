@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSM Tile Calculator — ESP32</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #13161b;
+    --surface2: #1c2028;
+    --border: #2a2f3a;
+    --accent: #00e5a0;
+    --accent2: #0077ff;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --danger: #ff4f4f;
+    --warn: #f59e0b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 740px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 2.5rem;
+  }
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.3);
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 5vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    margin-top: 0.6rem;
+    font-size: 14px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.6;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+  .form-group input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    padding: 10px 12px;
+    transition: border-color 0.2s;
+    outline: none;
+    width: 100%;
+  }
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,229,160,0.1);
+  }
+  .form-group input:hover { border-color: #3d4452; }
+
+  /* Zoom slider */
+  .zoom-wrap {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    margin-top: 12px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,229,160,0.4);
+  }
+  .zoom-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* Button */
+  .btn-calc {
+    margin-top: 1.25rem;
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.05em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-calc:hover {
+    background: #00ffb3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,229,160,0.3);
+  }
+  .btn-calc:active { transform: translateY(0); }
+
+  /* Results */
+  .results { display: none; }
+  .results.visible { display: block; }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .metric {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+  }
+  .metric-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .metric-val.blue { color: var(--accent2); }
+
+  .result-table { width: 100%; border-collapse: collapse; }
+  .result-table tr { border-bottom: 1px solid var(--border); }
+  .result-table tr:last-child { border-bottom: none; }
+  .result-table td {
+    padding: 10px 0;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .result-table td:first-child { color: var(--muted); }
+  .result-table td:last-child { text-align: right; color: var(--text); }
+
+  /* Code output */
+  .code-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .code-block {
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .code-block .kw { color: #c084fc; }
+  .code-block .num { color: #fb923c; }
+  .code-block .fn { color: #60a5fa; }
+
+  .btn-copy {
+    margin-top: 10px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-copy:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-copy.copied {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Alert */
+  .alert {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 1rem;
+    line-height: 1.5;
+  }
+  .alert.ok { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.2); color: var(--accent); }
+  .alert.warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); color: var(--warn); }
+  .alert.danger { background: rgba(255,79,79,0.08); border: 1px solid rgba(255,79,79,0.3); color: var(--danger); }
+  .alert-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  /* Tile range visual */
+  .tile-range {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .range-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .range-box .axis { color: var(--muted); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .range-box .vals { color: var(--text); font-size: 13px; }
+
+  /* Footer */
+  .footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #3d4452;
+  }
+
+  @media (max-width: 520px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .metric-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<div class="container">
+
+  <div class="header">
+    <div class="badge">ESP32-S3 · OSM · LVGL</div>
+    <h1>Tile <span>Calc</span></h1>
+    <p class="subtitle">* Convierte coordenadas GPS → tile X/Y para map_view_create()</p>
+    <p class="subtitle">By @surflaweb | @alcarazolabs</p>
+  </div>
+
+  <!-- Input -->
+  <div class="card">
+    <div class="card-title">Coordenadas del centro</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>LAT — Latitud</label>
+        <input type="number" id="lat" value="-23.550706" step="0.000001" placeholder="-23.550706">
+      </div>
+      <div class="form-group">
+        <label>LON — Longitud</label>
+        <input type="number" id="lon" value="-46.633382" step="0.000001" placeholder="-46.633382">
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="card-title" style="margin-bottom:8px;">Zoom level</div>
+      <div class="zoom-wrap">
+        <input type="range" id="zoom" min="1" max="19" value="16" oninput="document.getElementById('zoom-out').textContent=this.value; calc()">
+        <div class="zoom-val" id="zoom-out">16</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="card-title">Área descargada (delta)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>ΔLAT (±)</label>
+          <input type="number" id="dlat" value="0.01" step="0.001" placeholder="0.01">
+        </div>
+        <div class="form-group">
+          <label>ΔLON (±)</label>
+          <input type="number" id="dlon" value="0.01" step="0.001" placeholder="0.01">
+        </div>
+      </div>
+      <p style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:8px;">
+        // Debe coincidir con los valores usados en el script Python
+      </p>
+    </div>
+
+    <button class="btn-calc" onclick="calc()">▶ Calcular coordenadas</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <div class="card">
+      <div class="card-title">Resultado — tile de inicio</div>
+
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">start_tile_x</div>
+          <div class="metric-val" id="r-tx">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">start_tile_y</div>
+          <div class="metric-val" id="r-ty">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Total tiles</div>
+          <div class="metric-val blue" id="r-total">—</div>
+        </div>
+      </div>
+
+      <table class="result-table">
+        <tr><td>Zoom</td><td id="r-zoom">—</td></tr>
+        <tr><td>Tamaño en flash</td><td id="r-size">—</td></tr>
+        <tr><td>Tiles por fila (X)</td><td id="r-cols">—</td></tr>
+        <tr><td>Tiles por columna (Y)</td><td id="r-rows">—</td></tr>
+      </table>
+
+      <div class="tile-range">
+        <div class="range-box">
+          <div class="axis">Rango X</div>
+          <div class="vals" id="r-rx">—</div>
+        </div>
+        <div class="range-box">
+          <div class="axis">Rango Y</div>
+          <div class="vals" id="r-ry">—</div>
+        </div>
+      </div>
+
+      <div id="r-alert"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Línea para main.c</div>
+      <div class="code-label">// Reemplaza la llamada existente en app_main()</div>
+      <div class="code-block" id="r-code">—</div>
+      <button class="btn-copy" id="copy-btn" onclick="copyCode()">⧉ Copiar al portapapeles</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Verificación del script Python</div>
+      <div class="code-label">// Asegúrate de que tu script use estas mismas coordenadas</div>
+      <div class="code-block" id="r-python">—</div>
+      <button class="btn-copy" id="copy-py-btn" onclick="copyPython()">⧉ Copiar</button>
+    </div>
+
+  </div>
+
+  <div class="footer">OSM Tile System · zoom 16 → 65536×65536 tiles · cada tile = 256×256 px · 128 KB en RGB565</div>
+</div>
+
+<script>
+function deg2num(lat, lon, zoom) {
+  const latRad = lat * Math.PI / 180;
+  const n = Math.pow(2, zoom);
+  const x = Math.floor((lon + 180.0) / 360.0 * n);
+  const y = Math.floor((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n);
+  return { x, y };
+}
+
+function calc() {
+  const lat  = parseFloat(document.getElementById('lat').value);
+  const lon  = parseFloat(document.getElementById('lon').value);
+  const zoom = parseInt(document.getElementById('zoom').value);
+  const dlat = parseFloat(document.getElementById('dlat').value) || 0.01;
+  const dlon = parseFloat(document.getElementById('dlon').value) || 0.01;
+
+  if (isNaN(lat) || isNaN(lon) || isNaN(zoom)) return;
+
+  const center = deg2num(lat, lon, zoom);
+  const tl     = deg2num(lat + dlat, lon - dlon, zoom);
+  const br     = deg2num(lat - dlat, lon + dlon, zoom);
+
+  const xMin = Math.min(tl.x, br.x);
+  const xMax = Math.max(tl.x, br.x);
+  const yMin = Math.min(tl.y, br.y);
+  const yMax = Math.max(tl.y, br.y);
+
+  const cols  = xMax - xMin + 1;
+  const rows  = yMax - yMin + 1;
+  const total = cols * rows;
+  const sizeKB = total * 128;
+  const sizeMB = (sizeKB / 1024).toFixed(2);
+
+  document.getElementById('r-tx').textContent    = center.x;
+  document.getElementById('r-ty').textContent    = center.y;
+  document.getElementById('r-total').textContent = total;
+  document.getElementById('r-zoom').textContent  = zoom;
+  document.getElementById('r-size').textContent  = `${sizeMB} MB (${sizeKB} KB)`;
+  document.getElementById('r-cols').textContent  = cols;
+  document.getElementById('r-rows').textContent  = rows;
+  document.getElementById('r-rx').textContent    = `${xMin} → ${xMax}`;
+  document.getElementById('r-ry').textContent    = `${yMin} → ${yMax}`;
+
+  // Code line
+  const codeLine = `map_view_create(scr, ${zoom}, ${center.x}, ${center.y});`;
+  document.getElementById('r-code').innerHTML =
+    `<span class="fn">map_view_create</span>(<span class="kw">scr</span>, ` +
+    `<span class="num">${zoom}</span>, ` +
+    `<span class="num">${center.x}</span>, ` +
+    `<span class="num">${center.y}</span>);`;
+
+  // Python snippet
+  const pySnip =
+    `center_lat = ${lat.toFixed(6)}\n` +
+    `center_lon = ${lon.toFixed(6)}\n\n` +
+    `lat_min = center_lat - ${dlat}\n` +
+    `lat_max = center_lat + ${dlat}\n` +
+    `lon_min = center_lon - ${dlon}\n` +
+    `lon_max = center_lon + ${dlon}`;
+  document.getElementById('r-python').textContent = pySnip;
+
+  // Alert
+  let alertHTML = '';
+  if (total > 200) {
+    alertHTML = `<div class="alert danger"><span class="alert-icon">✗</span>` +
+      `${total} tiles = ${sizeMB} MB. Demasiado grande para la flash del ESP32. Reduce el delta o el zoom.</div>`;
+  } else if (total > 80) {
+    alertHTML = `<div class="alert warn"><span class="alert-icon">⚠</span>` +
+      `${total} tiles = ${sizeMB} MB. Verifica que tu partición SPIFFS tenga espacio suficiente.</div>`;
+  } else {
+    alertHTML = `<div class="alert ok"><span class="alert-icon">✓</span>` +
+      `${total} tiles = ${sizeMB} MB. Tamaño razonable para ESP32-S3 N16R8.</div>`;
+  }
+  document.getElementById('r-alert').innerHTML = alertHTML;
+
+  document.getElementById('results').classList.add('visible');
+
+  // reset copy buttons
+  ['copy-btn','copy-py-btn'].forEach(id => {
+    const b = document.getElementById(id);
+    b.classList.remove('copied');
+    b.textContent = b.textContent.replace('✓ Copiado','⧉ Copiar' + (id === 'copy-btn' ? ' al portapapeles' : ''));
+  });
+}
+
+function copyCode() {
+  const zoom  = document.getElementById('zoom').value;
+  const tx    = document.getElementById('r-tx').textContent;
+  const ty    = document.getElementById('r-ty').textContent;
+  const text  = `map_view_create(scr, ${zoom}, ${tx}, ${ty});`;
+  navigator.clipboard.writeText(text).then(() => {
+    const b = document.getElementById('copy-btn');
+    b.textContent = '✓ Copiado';
+    b.classList.add('copied');
+    setTimeout(() => { b.textContent = '⧉ Copiar al portapapeles'; b.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyPython() {
+  const text = document.getElementById('r-python').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const b = document.getElementById('copy-py-btn');
+    b.textContent = '✓ Copiado';
+    b.classList.add('copied');
+    setTimeout(() => { b.textContent = '⧉ Copiar'; b.classList.remove('copied'); }, 2000);
+  });
+}
+
+// Auto-calc on input change
+['lat','lon','dlat','dlon'].forEach(id => {
+  document.getElementById(id).addEventListener('input', calc);
+});
+
+// Initial calc
+calc();
+</script>
+</body>
+</html>
